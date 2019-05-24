@@ -1,0 +1,73 @@
+* Intro
+
+  - Going to be talking about memory models, in particular those
+    related to C and LLVM.
+  - Memory models, particularly for systems languages, have some
+    interesting trade-offs to discuss
+
+* TODO What is a memory model
+
+  - Model's the behaviour of the memory in the computer
+  - Programmers and compilers need to understand how memory works in
+    order to write correct programs and perform optimizations safely
+    + EXAMPLE OF SOME BEHAVIOURS YOU MIGHT WANT TO KNOW ABOUT
+
+      #+begin_src gcc
+#include <stdio.h>
+
+int main (int argc, char *argv[]) {
+    float f = 125.32f;
+    printf("%f", f);
+}
+// 0x405F547AE0000000
+      #+end_src
+
+      #+RESULTS:
+      : 0
+
+* Concrete vs Abstract
+
+  - Concrete:
+    + Model memory as a giant array
+    + finite (partial) map from addresses to /bytes/
+  - Abstract:
+    + Maybe have type
+
+* C Programming Language
+
+  - What makes it a "systems programming language?"
+  - You can manipulate memory "directly".
+    + Pointer <-> integer casts :O
+
+* TODO Ambiguity in C
+
+  - The specification is intentionally loose about how memory behaves.
+  - Specifying memory operations precisely can make the language inefficient on different platforms
+    + EXAMPLE. Stack growing in a certain direction?
+
+* A diversion into undefined behaviour
+
+  - In addition to not wanting to care about every particular detail
+    of the memory, you might also want to introduce undefined
+    behaviours.
+  - Seems like a really bad idea at first -- why not specify how your
+    programming language behaves in every situation?
+  - Actually a tool to give compilers a more powerful foundation to work with.
+
+* Why Undefined Behaviours?
+
+  - Let's compare C and Fortran for a moment!
+
+* Crazy GCC Examples
+
+  - ... and why they're "valid".
+
+* What does the C memory model look like?
+
+* WAT
+
+* Provenance
+
+* PVI
+
+* PNVI
