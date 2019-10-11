@@ -1,0 +1,186 @@
+* What is this talk about
+
+  - Okay, this talk is about undefined behaviour, nasal demons, and memory models for low level code.
+  - Not for anything, just my own understanding. So you get to watch me squirm.
+
+* Undefined Behaviour?
+
+  So first we have to take a bit of a detour through undefined behaviour.
+
+  - What is undefined behaviour?
+    + Is it things that we did not want to define, which we leave up to the discretion of the  implementation?
+      * No, that's more like "unspecified behaviour" or "implementation-defined behaviour"
+    + Something you can't rely upon to act a certain way?
+      * Certainly true from the programmer's perspective...
+      * But, I think there's a little bit more to it than that...
+    + Things that programs /can't/ do?
+      * This isn't quite the right picture either, I think, but in some sense a valid program should not exhibit UB.
+      * This notion will come up when thinking about how UB is treated by compilers.
+      * But I think this isn't quite the right way to look at it
+        either, and I think this is too negative in some sense. Often
+        there's a link between undefined behaviour and what you want
+        the compiler to be able to assume about programs.
+
+  # - Undefined behaviour describes operations that a valid program can not do
+  #   + I think this is too negative (to the point where this causes
+  #     confusion). We'll come back to that in a bit.
+  
+* What happens when UB is encountered?
+
+  When UB is raised the program can do anything.
+
+  This means that the implementation has a /lot/ of leeway for how to
+  handle programs that exhibit UB. The compiler can do *whatever* it
+  wants. This includes, but is in no way limited to:
+  
+  - noop, and then continue as normal
+  - halt
+  - halt *and* catch fire
+  - erase the hard drive
+    + no, seriously. Erase the hard drive.
+    + https://kristerw.blogspot.com/2017/09/why-undefined-behavior-may-call-never.html
+
+  - usually the compiler will just assume that the UB case can't
+    happen and will perform optimizations based solely upon the cases that are already defined.
+
+
+* So how do you accidentally erase a hard drive?
+
+  - Seriously, how?
+      * Basically set up a call using an uninitialized function pointer of a certain type.
+      * Have a function with that type available that deletes hard drive
+      * Compiler says "well, it's the only thing it could be, and if we don't initialize it it's UB and we could do anything, including calling that function... So, I'm just going to default to that."
+      * You are sad.
+  - It's not that the compiler goes "oh there's undefined behaviour here, therefore I can delete the hard drive."
+    + It might just be making assumptions about programs.
+      * This thing has to be defined before use, but the only thing of the right type is this... So I can just store that value right away.
+      * These two pointers can't alias because they come from different allocations
+  - It's weird because when you look at an actual machine and a
+    concrete execution of the code that you wrote down you might say
+    "well of course this was never assigned" or "of course these
+    pointers would actually have to overlap at this point", but the
+    compiler is essentially allowed to assume that only the defined
+    behaviour happens.
+  - In some sense UB is giving the compiler an axiom to work with.
+
+* So, why? Why have UB?
+
+  This leads us into why we might want to have UB.
+
+  Let's look at an example where UB is really useful!
+
+  #+begin_src c
+    if (a + b > a) {
+        do_something();
+     }
+  #+end_src
+
+  We might like to optimize this to the following, where no addition is needed:
+
+  #+begin_src c
+    if (b > 0) {
+        do_something();
+     }
+  #+end_src
+
+  - Makes some sense, because this matches up with the programmer's
+    intuition that these are just integers, not necessarily "bounded"
+    integers.
+  - Why can the compiler do this? Because signed integer overflow is undefined behaviour.
+    + "the compiler can do whatever it finds most convenient in the UB cases."
+    + Another way to think of this is that our compiler can assume
+      that UB doesn't happen, and do whatever it wants to handle the
+      case where it wouldn't happen.
+      * So, when an overflow happens the result is "wrong", but we
+        implicitly assume that our program doesn't do these bad
+        things.
+
+* Why do we need UB?
+
+  - Optimizations
+    + Especially in the case of a low level IR like LLVM. Can show
+      what analysis need not be done.
+  - Programmer's intent
+  - Really, it's all about giving the compiler a stronger set of assumptions to reason about code.
+    + Fortran assumes two pointers passed into a function don't alias. 
+
+* Undefined Behaviour is Too Negative!
+
+  - When dealing with UB it's often phrased like "passing pointers which alias is undefined behaviour".
+  - This gets the point across to the programmer, but it's confusing on the compiler side...
+  - Really this means "the compiler can assume that pointers don't alias."
+
+* Memory Models
+
+  - describe how interaction with memory works.
+  - can be fully abstract "you allocate memory and it's magic and you never have raw access to pointers".
+  - or fully concrete "here's your giant array of bytes."
+  - A mix...
+
+* Why a mix?
+
+  Let's think about a programming language like C, or LLVM IR.
+
+  - Want to enable low level programming
+    + Which means interacting with raw bytes and addresses.
+    + Do we have to be concrete, though?
+  - Want to also enable compiler optimizations
+    + Easier when things are more abstract... E.g., if you can assume
+      that certain pointers don't alias (e.g., pointers constructed
+      from separate allocations)
+  - We're going to talk about one thing in particular with respect to
+    this, and that's pointer provenance. So, let's look at an example.
+
+* Example
+
+  Constructing out of bounds pointers.
+
+  # Picture here
+
+  #+begin_src c
+    #include <stdio.h>
+    #include <string.h>
+    int x = 1, y = 2;
+    int main () {
+        int *p = &x + 1;  // Could overlap with y if x and y are located beside each other
+        int *q = &y;
+        if (memcmp(&p, &q, sizeof(p)) == 0) {
+            *p = 11;  // UB?
+            printf("x=%d y=%d *p=%d *q=%d\n",x,y,*p,*q);
+        }
+    }
+  #+end_src
+
+  - Compilers want to assume that you don't walk off the end of an allocated chunk of memory.
+  - Compilers also want to assume that were you to do this, you wouldn't run into another piece of memory.
+  - This sort of makes sense, because this isn't something that *you* want to do either
+  - Gives the compiler much more power to reason about pointer aliasing
+  - The C memory model has a notion of provenance associated with it.
+    + Every time you allocate memory, the pointer gets a unique
+      provenance which associates it with the memory region that was
+      allocated.
+
+  Compilers want to assume that you *don't* do this, and you probably
+  want that too. Generally when you write code you assume that you're
+  not jumping to random points in memory like this, especially since
+  it depends heavily on how memory is allocated, the specific
+  machine,and so on.
+
+  If you're thinking about a concrete machine then optimizing it to give
+
+  #+begin_example
+  x=1 y=2 *p=11 *q=2
+  #+end_example
+
+  Might seem like nonsense, because clearly *p = 11 overwrites the
+  value in *q, right?
+
+  That's fair, but it seems like.
+  
+  You could allow this behaviour, but it's
+  generally not that useful...
+
+
+And it prevents optimizations. E.g., we
+  want to do constant propagation of x, y, *p, and *q. But these
+  things don't stay constant if they alias.

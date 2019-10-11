@@ -2,6 +2,7 @@
 
   - Going to be talking about memory models, in particular those
     related to C and LLVM.
+
   - These languages have some interesting trade-offs that we are going
     to discuss.
 
@@ -103,6 +104,15 @@
     + This is part of why it's useful. Gives another axiom for
       analysis, but programmer must ensure these assumptions hold.
   - Can lead to very unexpected behaviour if triggered.
+
+* TODO Other Weird Things about UB
+
+  - If the compiler can prove that a branch exhibits UB, it can remove
+    that entire branch.
+  - This is somewhat different than just assuming the behaviour can't
+    happen. It's actively seeking out places where UB could be
+    triggered and then assuming that these places can't be reached
+    because of it.
 
 * TODO What is a memory model
 

@@ -1,0 +1,247 @@
+* Introduction
+
+  Hi, I'm Calvin, a second year PhD student here. Lately I have been
+  working a bit on the Vellvm project, which is a Coq semantics for
+  the LLVM intermediate representation. Part of my work on this
+  project has been on the handling of undefined behaviour and
+  unspecified values, which we are going to talk a little bit about
+  today.
+
+  This talk isn't for anything in particular, it's just for my own
+  understanding, and to talk a little bit about this weird area of
+  compilers and programming languages.
+
+  Plus you get to watch me squirm in front of an audience. Wonderful!
+
+* What is undefined behaviour?
+
+  Undefined behaviour is really exactly what it sounds like. It's
+  behaviour that hasn't been defined for a programming language.
+
+  Done.
+
+  This is a pretty simple definition, but it's easy to conflate it
+  with a few things, and it's also easy to get confused because it
+  really doesn't say much about what it means for something to be UB.
+
+  It's also a very language dependent thing. What may be considered UB
+  in one language may be perfectly well defined in another. This can
+  get confusing as well, and makes it somewhat difficult to nail down
+  what undefined behaviour is, because... Well, it depends!
+
+* What happens when you encounter UB?
+
+  So, keeping in mind that I still haven't told you what UB is... What
+  happens when you encounter undefined behaviour?
+
+  Anything.
+
+  Yes, really. Anything. The behaviour of undefined behaviour, being,
+  well, undefined, means that you can't really expect any particular
+  behaviour when it is encountered.
+
+  Often the compiler is going to do whatever is most efficient, or
+  most convenient in these cases, which may very well be not what you
+  expect. This includes, but is in no way limited to:
+  
+  - noop, and then continue as normal
+  - halt
+  - halt *and* catch fire
+  - erase the hard drive
+    + no, seriously. Erase the hard drive.
+    + https://kristerw.blogspot.com/2017/09/why-undefined-behavior-may-call-never.html
+
+* Why is this useful?
+
+  So, why have undefined behaviour at all? It seems kind of crazy to
+  have these little time bombs in your programming language. Can we
+  have a programming language without? Absolutely! But it does give
+  the compiler for such programming languages less flexibility for how
+  to handle optimizations and corner cases.
+
+  You see, undefined behaviour essentially gives the compiler extra
+  axioms to reason about your code. The compiler can assume that
+  undefined behaviour is not triggered in a program, which can
+  actually be really useful, and more accurately reflect programmer intent.
+
+  Take for instance this simple piece of code
+
+  #+begin_src c
+    a + b < a + c
+  #+end_src
+  
+  You might think, "bah"! I don't want to do two extra additions, the
+  compiler should be able to rewrite this to:
+
+  #+begin_src c
+    b < c
+  #+end_src
+
+  and, in fact, C compilers will happily do this optimization...
+
+  But isn't it... wrong? After all, what if ~a + b~ overflows, resulting in a negative number?
+
+  #+begin_src c
+  1 + INT_MAX < 1 + 3
+  ==
+  INT_MIN < 4 == True
+
+  // But...
+
+  INT_MAX < 3 == False
+  #+end_src
+
+  However, in C signed integer overflow is undefined behaviour, which
+  essentially says that we don't care what the result of that
+  operation is in such corner cases, we'll just assume that good
+  programs don't do such silly things, and then on any valid program
+  which doesn't exhibit undefined behaviour the optimization does what
+  you expect.
+
+  So, in some sense undefined behaviour can help the compiler to make
+  optimizations based on how programmers actually expect things to be
+  used. Generally speaking you don't want integers to overflow, you
+  want to assume that all of the values you operate on actually fit in
+  your data type, and you want to reason about code based on that
+  simpler semantics which holds almost always. It comes with some
+  extra burden, the programmer has to make sure that the invariant "no
+  signed overflow" actually holds, otherwise they risk the compiler
+  transforming their code in unexpected ways, but this is a tradeoff
+  and we do get something from it.
+
+* Pointer aliasing
+
+  Undefined behaviour can also allow compilers to make optimizations
+  based on invariants whose proofs are undecidable in general.
+
+  For instance, it might be really nice to optimize this:
+
+  #+begin_src c
+    void sum(double *total, double *array, size_t len )
+    {
+        ,*total = 0;
+        for (size_t i=0; i<len; i++) {
+            ,*total += array[i];
+        }
+    }
+  #+end_src
+
+  To this:
+
+  #+begin_src c
+    void sum(double *total, double *array, size_t len )
+    {
+        double local_total = 0;
+        for (size_t i=0; i<len; i++) {
+            local_total += array[i];
+        }
+
+        ,*total = local_total;
+    }
+  #+end_src
+
+  This version only has to write the total to memory once at the end,
+  which sounds pretty good.
+
+  Unfortunately, this has a different semantics than the original
+  program when ~total~ is an address in the array. C assumes that the
+  pointers can alias, so it can't make this optimization. Other
+  programming languages like Fortran, however, make a different
+  assumption, and say that the programmer is responsible for ensuring
+  that the pointer arguments to the function don't alias, and that if
+  two pointers are passed in that do alias the result is undefined
+  behaviour (so, the compiler can do whatever, who cares). This is
+  less convenient for the programmer, but it lets Fortran be *really*
+  fast, so why not.
+
+  Interestingly, C provides a keyword now to say that pointers don't
+  alias, allowing C compilers to make the same set of optimizations.
+
+  #+begin_src c
+    void sum(restrict double *total, restrict double *array, size_t len )
+    {
+        ,*total = 0;
+        for (size_t i=0; i<len; i++) {
+            ,*total += array[i];
+        }
+    }
+  #+end_src
+
+* Undefined behaviour in LLVM
+
+  So, undefined behaviour does have its uses. And whether or not you
+  think it's a good idea to pass the burden of undefined behaviour
+  onto the programmer, it seems to make a lot of sense for an
+  intermediate representation like LLVM.
+
+  Undefined behaviour is a way of passing down invariants other stages
+  of the compiler (or programmer-compiler stack) could prove, and that
+  an IR like LLVM can just assume.
+
+  You almost want the intermediate language to have more control over
+  undefined behaviour. For instance, with LLVM IR you can control
+  what's considered undefined behaviour for add instructions.
+
+  #+begin_src llvm
+    <result> = add <ty> <op1>, <op2>          ; yields ty:result
+    <result> = add nuw <ty> <op1>, <op2>      ; yields ty:result
+    <result> = add nsw <ty> <op1>, <op2>      ; yields ty:result
+    <result> = add nuw nsw <ty> <op1>, <op2>  ; yields ty:result
+  #+end_src
+
+  The ~nuw~ and ~nsw~ flags control whether using a result that
+  overflows is undefined behaviour. If it's not UB then it's treated
+  as normal 2's complement modular arithmetic.
+
+  This degree of control seems really useful, and you could imagine
+  having annotations for LLVM functions that for instance say "these
+  two pointers don't alias", which could be really useful for
+  programming languages like Rust which can guarantee that pointer
+  arguments don't alias statically, and also useful for things like
+  Fortran which put the burden of ensuring there's no aliasing on
+  programmers.
+
+  Having a type system that could allow you to express these
+  invariants could be really useful, and explicit annotations could
+  make it clear when you actually rely upon undefined behaviour, and
+  we're already starting to see some cases of this, like with C99s
+  ~restrict~ keyword, which says that a pointer argument does not
+  alias with anything. May we live in interesting times.
+
+* Indeterminate values
+
+  Often 
+
+* What is undefined behaviour?
+
+  Some possibilities (similar, maybe not all are "right"):
+
+  1. Something that we did not want to define in detail, but wanted to leave up to the discretion of the implementation?
+  2. Something which you can't rely upon to act in a certain way?
+  3. Things that programs can't do?
+
+** Unspecified / Implementation defined?
+
+   Let's look at the first option. Is undefined behaviour just things
+   that are unspecified?
+
+   For instance, if you allocate an integer, but don't initialize it,
+   and then print the value of that allocated integer... Is that
+   undefined behaviour?
+
+   It could be, but it sort of depends on the language, and what the
+   people writing the compilers decide.
+
+* Why do we want undefined behaviour?
+
+** Programmer facing
+** Compiler facing
+
+* Undefined behaviour in the context of LLVM
+
+** Undef
+** Poison
+** Headaches
+** Actual UB
+
+* 
