@@ -266,9 +266,43 @@
    don't care about what value this variable has at all, even if it
    changes randomly between uses".
 
+*** More complicated undef
+
+   However, our current understanding of ~undef~ is that in this case:
+
+   #+begin_src llvm
+     %x = i32 undef
+     %y = mul i32 %x 2
+   #+end_src
+
+   ~%y~ is actually the set of all even numbers, so something like
+
+   #+begin_src llvm
+     %z = add i32 %y %y
+   #+end_src
+
+   would be the set of all multiples of 2, and not multiples of 4 like
+   you might expect, because in this expression ~%y~ is actually
+   allowed to take different values each time it's used, it's just
+   constrained to be a multiple of 2 each time.
+
+   This seems sort of crazy, because after you compute a value for
+   ~%y~ it seems like it would make sense to just save that value and
+   use it in both places. This is still a valid thing to do, of
+   course, but LLVM lets this behave more broadly, which can
+   potentially allow for more optimizations. We'll see how this is
+   painful for Vellvm shortly.
+
 *** How is it useful?
 
+    But first, how is ~undef~ actually useful for optimizations?
+
 *** How do we handle ~undef~ in Vellvm?
+
+    ~undef~ handling in Vellvm is fairly complex as we wanted to match
+    the apparent semantics of LLVM as much as possible.
+
+    
 
 ** Poison
 
@@ -277,6 +311,32 @@
    - Can always relax to ~undef~.
 
 *** How is it useful?
+
+    ~poison~ is essentially a kind of deferred undefined behaviour.
+
+    This can be really useful for a kind of speculative execution. For
+    instance if you want to perform loop invariant code motion,
+    optimizations which lift loop invariant expressions outside of
+    loops. For instance:
+
+    #+begin_src c
+      while (c) {
+          int x = 1 / k;
+          printf("%d\n", x);
+      }
+    #+end_src
+
+    Could potentially be optimized to:
+
+    #+begin_src c
+      int x = 1 / k;
+      while (c) {
+          printf("%d\n", x);
+      }
+    #+end_src
+
+    But this only works in the case where ~k~ is nonzero.
+
 *** How do we handle ~poison~ in Vellvm?
 
 * Example of hoisting?
@@ -292,35 +352,7 @@
 *** Why is this better?
 ** Can vellvm support this
 
-* Old stuff?
-** What is undefined behaviour?
-
-  Some possibilities (similar, maybe not all are "right"):
-
-  1. Something that we did not want to define in detail, but wanted to leave up to the discretion of the implementation?
-  2. Something which you can't rely upon to act in a certain way?
-  3. Things that programs can't do?
-
-*** Unspecified / Implementation defined?
-
-   Let's look at the first option. Is undefined behaviour just things
-   that are unspecified?
-
-   For instance, if you allocate an integer, but don't initialize it,
-   and then print the value of that allocated integer... Is that
-   undefined behaviour?
-
-   It could be, but it sort of depends on the language, and what the
-   people writing the compilers decide.
-
-*** Why do we want undefined behaviour?
-
-*** Programmer facing
-*** Compiler facing
-
-** Undefined behaviour in the context of LLVM
-
-*** Undef
-*** Poison
-*** Headaches
-*** Actual UB
+   - Should be a fairly trivial change due to how everything is set up.
+   - Currently don't want to support it because it would mean that
+     Vellvm would have freeze instructions, which LLVM currently
+     doesn't have :(.
