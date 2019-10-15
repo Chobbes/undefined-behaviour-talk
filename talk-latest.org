@@ -26,8 +26,8 @@
 
   It's also a very language dependent thing. What may be considered UB
   in one language may be perfectly well defined in another. This can
-  get confusing as well, and makes it somewhat difficult to nail down
-  what undefined behaviour is, because... Well, it depends!
+  get confusing, and makes it somewhat difficult to nail down what
+  undefined behaviour is, because... Well, it depends!
 
 * What happens when you encounter UB?
 
@@ -41,7 +41,7 @@
   behaviour when it is encountered.
 
   Often the compiler is going to do whatever is most efficient, or
-  most convenient in these cases, which may very well be not what you
+  most convenient in these cases, which may very well not be what you
   expect. This includes, but is in no way limited to:
   
   - noop, and then continue as normal
@@ -107,7 +107,7 @@
   extra burden, the programmer has to make sure that the invariant "no
   signed overflow occurs" actually holds, otherwise they risk the
   compiler transforming their code in unexpected ways, but this is a
-  tradeoff and we do get something from it.
+  tradeoff and we do get something from it --- higher performance code.
 
 * Pointer aliasing
 
@@ -140,19 +140,32 @@
     }
   #+end_src
 
-  Unfortunately, this behaves differently than the original
-  program when ~total~ is an address in the array. C assumes that the
-  pointers can alias, so it can't make this optimization and has to
-  perform a write every time. Other programming languages like
-  Fortran, however, make a different assumption, and say that the
-  programmer is responsible for ensuring that the pointer arguments to
-  the function don't alias, and that if two pointers are passed in
-  that do alias the result is undefined behaviour (so, the compiler
-  can do whatever, who cares). This is less convenient for the
-  programmer, but it lets Fortran be *really* fast, so why not.
+  Unfortunately, this behaves differently than the original program
+  when ~total~ is an address in the array. If ~total~ aliases
+  ~array[i]~ for some ~i~, then we have to make sure we store the
+  total before we add ~array[i]~, because this will change the value
+  of ~array[i]~.  
 
-  Interestingly, C provides a keyword now to say that pointers don't
-  alias, allowing C compilers to make the same set of optimizations.
+  C, assumes that the pointers can alias, so it can't make this
+  optimization and has to perform a write every time. Other
+  programming languages like Fortran, however, make a different
+  assumption, and say that the programmer is responsible for ensuring
+  that the pointer arguments to the function don't alias, and that if
+  two pointers are passed in that do alias the result is undefined
+  behaviour (so, the compiler can do whatever, who cares). This is
+  less convenient for the programmer, but it lets Fortran be *really*
+  fast, so why not.
+
+  Furthermore, while it may seem crazy for Fortran to make this
+  assumption, I believe Rust ensures that mutable pointers can not
+  alias. So, the Rust compiler essentially has a proof that they don't
+  alias, and it makes sense to forget this proof and just say "oh it
+  doesn't happen" at the level of an intermediate representation like
+  LLVM IR.
+
+  Interestingly, C actually does provide a keyword to tell the compiler
+  "trust me, these pointers don't alias", allowing C compilers to make
+  the same set of optimizations, just with an extra tag.
 
   #+begin_src c
     void sum(double* restrict total, double* restrict array, size_t len )
@@ -163,6 +176,14 @@
         }
     }
   #+end_src
+
+* How powerful is undefined behaviour?
+
+  # Should this be here, or somewhere else?
+ So, this is just a side note. It seems like this undefined behaviour
+ thing is really useful. The compiler can just assume that these bad
+ cases don't happen, and then it can do whatever it wants in these
+ bad situations which we assume don't happen.
 
 * Undefined behaviour in LLVM
 
@@ -225,9 +246,11 @@
 * Indeterminate values
 
   ~undef~ and ~poison~ are what we call indeterminate values,
-  particularly ~undef~.  Often it is very convenient to be able to say
-  "it doesn't matter what value this has", or "this value won't be
-  used", which is essentially what ~undef~ and ~poison~ do.
+  particularly ~undef~.  They're intimately related to undefined
+  behaviour, but they themselves are not undefined behaviour.  Often
+  it is very convenient to be able to say "it doesn't matter what
+  value this has", or "this value won't be used", which is essentially
+  what ~undef~ and ~poison~ do.
 
 ** Undef
 
@@ -310,6 +333,10 @@
 
    - Can always relax to ~undef~.
 
+   Generally much simpler to understand than ~undef~, the result of
+   pretty much any operation on ~poison~ is just ~poison~, and if it's
+   used in any side-effecting way then it raises undefined behaviour.
+
 *** How is it useful?
 
     ~poison~ is essentially a kind of deferred undefined behaviour.
@@ -339,6 +366,42 @@
 
 *** How do we handle ~poison~ in Vellvm?
 
+** ~poison~ vs ~undef~
+
+   I don't want to get too into the weeds about the differences
+   between ~poison~ and ~undef~. It's a bit confusing that LLVM has
+   both of these things, and they're slightly different. ~poison~ is
+   essentially stronger than ~undef~, and essentially says that if the
+   value is used then it's undefined behaviour. ~undef~ means that the
+   value can take on any arbitrary bit pattern, kind of like an
+   uninitialized variable. They both justify different optimizations.
+
+   For instance if overflow was ~undef~ instead of ~poison~ then you
+   wouldn't be able to optimize
+
+   #+begin_src c
+   a + 1 > a
+   #+end_src
+
+   to
+
+   #+begin_src c
+   true // Or I guess 1 in C... Whatever. Something something type system.
+   #+end_src
+
+   If you get ~poison~ when ~a + 1~ overflows, then this is undefined
+   behaviour, so we can just ignore this case and perform the
+   optimization that we want.
+
+   If instead you got ~undef~ when ~a + 1~ overflows, then we would be
+   able to refine to any arbitrary value for ~a + 1~, and optimize
+   based on that. However, if ~a + 1~ overflows, then this means that
+   ~a == INT_MAX~ which is no good because then we can't pick anything
+   for ~a + 1~ which is larger than ~INT_MAX~, so we can't just pick a
+   value that makes this expression a constant ~true~.
+
+   Similarly undef can justify...
+
 * Example of hoisting?
 
 * UB in Vellvm
@@ -356,3 +419,18 @@
    - Currently don't want to support it because it would mean that
      Vellvm would have freeze instructions, which LLVM currently
      doesn't have :(.
+
+* What about erasing the hard drive?
+
+  - Short explanation of this if there's time.
+
+* Bibliography
+
+- https://blog.regehr.org/archives/1496
+- John Regehr's Guide to UB is good
+  + https://blog.regehr.org/archives/213
+  + https://blog.regehr.org/archives/226
+  + https://blog.regehr.org/archives/232
+- http://www.cs.utah.edu/~regehr/papers/undef-pldi17.pdf
+- https://www.cl.cam.ac.uk/~pes20/cerberus/cerberus-popl2019.pdf
+- https://kristerw.blogspot.com/2017/09/why-undefined-behavior-may-call-never.html
