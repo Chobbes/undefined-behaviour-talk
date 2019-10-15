@@ -441,7 +441,7 @@
    pretty much any operation on ~poison~ is just ~poison~, and if it's
    used in any side-effecting way then it raises undefined behaviour.
 
-*** How is it useful?
+*** TODO How is it useful?
 
     ~poison~ is essentially a kind of deferred undefined behaviour.
 
@@ -452,7 +452,7 @@
 
     #+begin_src c
       while (c) {
-          int x = 1 / k;
+          int x = k + 1;
           printf("%d\n", x);
       }
     #+end_src
@@ -460,7 +460,7 @@
     Could potentially be optimized to:
 
     #+begin_src c
-      int x = 1 / k;
+      int x = k + 1;
       while (c) {
           printf("%d\n", x);
       }
@@ -470,7 +470,9 @@
 
 *** How do we handle ~poison~ in Vellvm?
 
-** ~poison~ vs ~undef~
+** TODO ~poison~ vs ~undef~
+
+   # finish the part with undef justifying an optimization.
 
    I don't want to get too into the weeds about the differences
    between ~poison~ and ~undef~. It's a bit confusing that LLVM has
