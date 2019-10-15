@@ -1,0 +1,127 @@
+\documentclass{beamer}
+
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{hyperref}
+
+\usepackage[backend=bibtex]{biblatex}
+\addbibresource{citations.bib}
+
+% http://tex.stackexchange.com/questions/68080/beamer-bibliography-icon
+\setbeamertemplate{bibliography item}{%
+  \ifboolexpr{ test {\ifentrytype{book}} or test {\ifentrytype{mvbook}}
+    or test {\ifentrytype{collection}} or test {\ifentrytype{mvcollection}}
+    or test {\ifentrytype{reference}} or test {\ifentrytype{mvreference}} }
+    {\setbeamertemplate{bibliography item}[book]}
+    {\ifentrytype{online}
+       {\setbeamertemplate{bibliography item}[online]}
+       {\setbeamertemplate{bibliography item}[article]}}%
+  \usebeamertemplate{bibliography item}}
+
+\defbibenvironment{bibliography}
+  {\list{}
+     {\settowidth{\labelwidth}{\usebeamertemplate{bibliography item}}%
+      \setlength{\leftmargin}{\labelwidth}%
+      \setlength{\labelsep}{\biblabelsep}%
+      \addtolength{\leftmargin}{\labelsep}%
+      \setlength{\itemsep}{\bibitemsep}%
+      \setlength{\parsep}{\bibparsep}}}
+  {\endlist}
+  {\item}
+
+% Colours for beamer.
+\setbeamercolor{frametitle}{fg=orange}
+\setbeamertemplate{itemize item}{\color{orange}$\blacksquare$}
+\setbeamertemplate{itemize subitem}{\color{orange}$\blacktriangleright$}
+
+% Colours for syntax highlighting
+\definecolor{syntax_red}{rgb}{0.7, 0.0, 0.0} % For strings
+\definecolor{syntax_green}{rgb}{0.15, 0.5, 0.25} % For comments
+\definecolor{syntax_orange}{rgb}{0.7, 0.4, 0.2} % For keywords
+
+
+% Haskell settings for lstlisting
+\lstset{language=Haskell,
+basicstyle=\ttfamily\tiny,
+keywordstyle=\color{syntax_orange}\bfseries,
+stringstyle=\color{syntax_red},
+commentstyle=\color{syntax_green},
+numbers=none,
+numberstyle=\color{black},
+stepnumber=1,
+frame=single,
+breaklines=true,
+numbersep=10pt,
+tabsize=4,
+showspaces=false,
+showstringspaces=false}
+
+\author{
+  Beck, Calvin\\
+  \href{mailto:hobbes@seas.upenn.edu}{hobbes@seas.upenn.edu}
+}
+
+\begin{document}
+
+\begin{frame}
+  \frametitle{The Whacky World of Undefined Behaviour}
+  \maketitle
+\end{frame}
+
+\section{Introduction}
+
+\begin{frame}
+  \frametitle{What is this Talk about?}
+
+  Undefined behaviour! With a smack of LLVM.\\~\
+
+  We'll cover things like:
+
+  \begin{itemize}
+  \item What is undefined behaviour?
+  \item What happens when you encounter UB?
+  \item How is UB useful? Should we avoid it?
+    \begin{itemize}
+    \item Optimizations?
+    \end{itemize}
+  \item UB in LLVM (and indeterminate values)
+  \item How this all fits into Vellvm
+  \end{itemize}
+  \vspace{\baselineskip}
+  Not for anything in particular! It's just a fun topic, and hopefully
+  talking about it will clarify some things for myself and you!
+
+\end{frame}
+
+\section{What is undefined behaviour?}
+
+\begin{frame}[fragile]
+  \frametitle{What is undefined behaviour (UB)?}
+
+  It's behaviour...\\~
+
+  \pause
+
+  That's undefined.\\~
+
+  \pause
+
+  \huge{Done.}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{References}
+
+  \nocite{*}
+  \printbibliography
+
+  These are all good resources! You should look at them!
+\end{frame}
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

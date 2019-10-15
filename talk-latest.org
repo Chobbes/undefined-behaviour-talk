@@ -266,7 +266,7 @@
   So, undefined behaviour does have its uses. And whether or not you
   think it's a good idea to pass the burden of undefined behaviour
   onto the programmer, it seems to make a lot of sense for an
-  intermediate representation like LLVM.
+  intermediate representation used for optimizations, like LLVM.
 
   Undefined behaviour is a way of passing down invariants other stages
   of the compiler (or programmer-compiler stack) could prove, and that
