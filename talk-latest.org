@@ -518,7 +518,21 @@
 
 * A better future? Freeze / thaw semantics
 ** Freeze / Thaw
+
+   undef and poison are pretty confusing. One method of making this
+   better is the proposed freeze / thaw semantics which basically
+   removes ~undef~ in favor of ~poison~, and then adds a ~freeze~
+   instruction which turns a ~poison~ value into a nondeterministic
+   choice like ~undef~, but which is immediately fixed to a value,
+   instead of having the weird ~undef~ lazy semantics.
+
 *** Why is this better?
+
+    - Much easier to understand
+      + the ~undef~ equivalent, ~freeze~ of ~poision~ acts how you
+        expect ~undef~ to behave.
+    - Undef behaviour can still be recovered, it just has to be explicit.
+
 ** Can vellvm support this
 
    - Should be a fairly trivial change due to how everything is set up.
