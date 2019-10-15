@@ -148,18 +148,18 @@
   Unfortunately, this behaves differently than the original program
   when ~total~ is an address in the array. If ~total~ aliases
   ~array[i]~ for some ~i~, then we have to make sure we store the
-  total before we add ~array[i]~, because this will change the value
-  of ~array[i]~.  
+  ~total~ before we add ~array[i]~, because this will change the value
+  of ~array[i]~.
 
   C, assumes that the pointers can alias, so it can't make this
-  optimization and has to perform a write every time. Other
-  programming languages like Fortran, however, make a different
-  assumption, and say that the programmer is responsible for ensuring
-  that the pointer arguments to the function don't alias, and that if
-  two pointers are passed in that do alias the result is undefined
-  behaviour (so, the compiler can do whatever, who cares). This is
-  less convenient for the programmer, but it lets Fortran be *really*
-  fast, so why not?
+  optimization and has to perform a write every time the loop's body
+  is executed. Other programming languages like Fortran, however, make
+  a different assumption, and say that the programmer is responsible
+  for ensuring that the pointer arguments to the function don't alias,
+  and that if two pointers are passed in that do alias the result is
+  undefined behaviour (so, the compiler can do whatever, who
+  cares). This is less convenient for the programmer, but it lets
+  Fortran be *really* fast, so why not?
 
   Furthermore, while it may seem crazy for Fortran to make this
   assumption, I believe Rust ensures that mutable pointers can not
