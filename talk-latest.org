@@ -188,8 +188,7 @@
  So, this is a bit of a side note. It seems like this undefined
  behaviour thing is really useful, for the compiler anyway. The
  compiler can just assume that these bad cases don't happen, and then
- it can do whatever it wants in these bad situations which it assumes
- don't happen.
+ it can do whatever it wants in these bad situations.
 
  But how far does this extend? It seems like there's a couple of camps
  with respect to this, and I'm not really sure who to believe.
