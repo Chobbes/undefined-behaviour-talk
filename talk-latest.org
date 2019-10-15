@@ -397,7 +397,9 @@
 
 *** TODO How does ~undef~ relate to UB?
 
-*** How do we handle ~undef~ in Vellvm?
+*** TODO How do we handle ~undef~ in Vellvm?
+
+    # Want to mention pick as well.
 
     ~undef~ handling in Vellvm is fairly complex as we wanted to match
     the apparent semantics of LLVM as much as possible. This means
