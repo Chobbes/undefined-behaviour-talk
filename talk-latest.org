@@ -182,10 +182,9 @@
     }
   #+end_src
 
-* TODO How powerful is undefined behaviour? Can it time travel?
+* How powerful is undefined behaviour? Can it time travel?
 
   # Should this be here, or somewhere else?
-  # Add example
  So, this is a bit of a side note. It seems like this undefined
  behaviour thing is really useful, for the compiler anyway. The
  compiler can just assume that these bad cases don't happen, and then
@@ -195,22 +194,56 @@
  But how far does this extend? It seems like there's a couple of camps
  with respect to this, and I'm not really sure who to believe.
 
+ One camp says that valid programs never exhibit UB, so if there's a
+ branch where UB is always executed, we can just remove that branch
+ entirely... So, for something like:
+
+ #+begin_src c
+   char inp = getchar();
+   if ('A' == inp) {
+       printf("Hello, world!\n");
+       x = 1 / 0;
+   }
+ #+end_src
+
+ The if statement can just be optimized to a noop, never printing
+ "Hello, world!", even though that happens before the division
+ by 0. This is because if we go down this path of execution, we're
+ guaranteed to encounter UB. Therefore we clearly can't ever execute
+ this branch, which means ~c~ must also always be false, and this if
+ statement can just be removed. The compiler seems to conclude that no
+ user will ever input ~A~, and all is right with the world.
+
+ This seems a bit extreme, though! A gentler semantics for UB is to
+ assume that anything can happen once UB is exhibited, but not
+ before. So, perhaps we can just get rid of the bad division, but no
+ more.
+
+ #+begin_src c
+   char inp = getchar();
+   if ('A' == inp) {
+       printf("Hello, world!\n");
+       x = 1 / 0;
+   }
+ #+end_src
+
  I believe that CompCert (and Vellvm as well) take the latter, more
  conservative approach. This is certainly more stable than the former
  approach (in fact, it's also a refinement of it), and it does seem to
  make more sense from the perspective that none of the prior
  operations exhibit undefined behaviour, so it seems a bit silly to
  have this time traveling undefined behaviour... But I can also see an
- argument for this. The compiler can prove that this path will exhibit
- UB, but it also assumes that UB doesn't happen. Therefore, the
- program shouldn't go down this path.
+ argument for the more aggressive version. The compiler can prove that
+ this path will exhibit UB, but it also assumes that UB doesn't
+ happen. Therefore, the program shouldn't go down this path!
 
- I think the primary difference here, though, is that the more potent
- option assumes that UB can not happen, while the latter merely states
- that triggering UB means anything can happen.
+ The primary difference here, is that the more potent option assumes
+ that UB /cannot/ happen, while the latter merely states that
+ triggering UB means /anything/ can happen.
 
- I'm not really sure what the right choice is. The C++ standard, for
- instance, seems to explicitly state that this time traveling is allowed.
+ I'm not really sure what the right choice is, though. For instance,
+ the C++ standard, for instance, seems to explicitly state that this
+ time traveling is allowed.
 
  #+begin_example
    However, if any such execution contains an undefined operation,
