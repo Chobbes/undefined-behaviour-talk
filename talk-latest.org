@@ -289,12 +289,12 @@
   #+end_src
 
   By default addition is a fully defined operation, with overflow
-  being the result modulo $2^n$, and signed integers having a two's
-  complement representation. The ~nuw~ and ~nsw~ flags control whether
-  relying on a result that overflows is undefined behaviour for
-  unsigned and signed addition respectively. Similarly the ~fadd~
+  being the result modulo $2^n$, and with signed integers having a
+  two's complement representation. The ~nuw~ and ~nsw~ flags control
+  whether relying on a result that overflows is undefined behaviour
+  for unsigned and signed addition respectively. Similarly the ~fadd~
   floating point addition instruction has similar semantics-toggling
-  flags to allow for fast math optimizations.
+  flags to allow for fast math optimizations, which is kind of neat.
 
   This degree of control seems really useful, and you could imagine
   having annotations for LLVM functions that for instance say "these
@@ -311,15 +311,11 @@
   ~restrict~ keyword, which says that a pointer argument does not
   alias with anything. May we live in interesting times.
 
-* LLVM and undefined behaviour
-
-  So, now I'm going to talk a bit about undefined behaviour and
-  handling it in LLVM, and in particular Vellvm.
-
-  But first we have to discuss a majorly important part of
-  LLVM. ~undef~ and ~poison~ values.
-
 * Indeterminate values
+
+  I'm going to talk a bit about UB and handling it in LLVM / Vellvm,
+  but first we have to discuss an import part of LLVM. ~undef and
+  ~poison~ values.
 
   ~undef~ and ~poison~ are what we call indeterminate values,
   particularly ~undef~.  They're intimately related to undefined
@@ -336,7 +332,10 @@
    It can be very tempting to think of ~undef~ as being UB because of
    the name, but it's actually a very different concept. ~undef~ can
    be thought of as an "unspecified" or "uninitialized" value. This
-   means that the value can take on any bit pattern.
+   means that the value can take on any bit pattern. This might lead
+   to UB if a possible value triggers UB, but it also doesn't have
+   to. Here we're just saying "we don't care what value this variable
+   takes, make it whatever is convenient at the time.
 
    One point of confusion with ~undef~ is that LLVM really does not
    like to hold a particular representation of a value that we don't
@@ -362,8 +361,8 @@
    # Maybe explain "don't care" better.
    This does mean that ~undef~ is somewhat stronger than "we don't
    care what value this variable is assigned", it's essentially "we
-   don't care about what value this variable has at all, even if it
-   changes randomly between uses".
+   don't care about what value this variable has at all throughout its
+   entire life-cycle, if it changes randomly between uses".
 
 *** More complicated undef
 
@@ -389,25 +388,52 @@
    ~%y~ it seems like it would make sense to just save that value and
    use it in both places. This is still a valid thing to do, of
    course, but LLVM lets this behave more broadly, which can
-   potentially allow for more optimizations. We'll see how this is
-   painful for Vellvm shortly.
+   potentially allow for more optimizations, but we will see how this
+   is painful for Vellvm shortly.
 
-*** How is it useful?
+*** TODO How is it useful?
 
     But first, how is ~undef~ actually useful for optimizations?
+
+*** TODO How does ~undef~ relate to UB?
 
 *** How do we handle ~undef~ in Vellvm?
 
     ~undef~ handling in Vellvm is fairly complex as we wanted to match
-    the apparent semantics of LLVM as much as possible.
+    the apparent semantics of LLVM as much as possible. This means
+    that wherever we have ~undef~ we essentially have to construct and
+    keep around a full expression.
 
-    
+    #+begin_src c
+    (undef + 2) * (3 * undef)  // Left in this complicated form
+    #+end_src
+
+    This lets us preserve the set of values that expressions involving
+    undef can take on, and we can get the kind of delayed
+    nondeterministic choice that we saw previously. We call these
+    partially undefined expressions ~uvalues~.
+
+    One problem with this approach, though, is that the interface for
+    the memory model is currently not expressive enough. It only
+    accepts ~dvalues~, which are concrete values in LLVM. In some
+    sense this is reasonable because, because it makes sense that you
+    would have to concretize a value in order to store it in memory,
+    and it seems like that would fix what the value could be... But it
+    does also seem like LLVM permits the compiler to treat values in
+    memory as though they can be partially undefined as well.
+
+    Vellvm doesn't support storing partially defined values in memory
+    right now, and in some sense that sort of makes sense. Otherwise
+    concrete memory models would have to be able to concretize and
+    evaluate LLVM expressions in order to store a value in memory,
+    which is a little frustrating because we want the memory model to
+    be very modular and oblivious to how LLVM works. This is a
+    potential area for improvement.
 
 ** Poison
 
-   ~poison~ is an even stronger result than ~undef~.
-
-   - Can always relax to ~undef~.
+   ~poison~ is an even stronger result than ~undef~, and we can
+   actually always relax ~poison~ to ~undef~.
 
    Generally much simpler to understand than ~undef~, the result of
    pretty much any operation on ~poison~ is just ~poison~, and if it's
