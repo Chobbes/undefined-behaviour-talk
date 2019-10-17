@@ -354,6 +354,13 @@
   value this has", or "this value won't be used", which is essentially
   what ~undef~ and ~poison~ do.
 
+  It's worth prefacing this section with the fact that ~undef~ and
+  ~poison~ are sort of... Disputed. Different optimization passes
+  treat them differently, and they are not terribly well
+  defined. We're currently trying to describe LLVM as it is in Vellvm,
+  but it's kind of maddening and there are proposals to change how
+  this works entirely because it is well and truly confusing.
+
 ** Undef
 
    LLVM lets you specify that a value is ~undef~, but what exactly
@@ -362,7 +369,7 @@
    concept. ~undef~ can be thought of as an "unspecified" or
    "uninitialized" value. This means that the value can take on any
    bit pattern. This might lead to UB if a possible value triggers UB,
-   but it also doesn't have to. Here we're just saying "we don't care
+   but it also doesn't /have/ to. Here we're just saying "we don't care
    what value this variable takes, make it whatever is convenient at
    the time.
 
@@ -443,9 +450,12 @@
     it, and the compiler doesn't have to ensure that ~x~ gets assigned
     some value like ~0~ when it's not necessary.
 
-*** TODO How do we handle ~undef~ in Vellvm?
+    # Why not just poison? Well, branching on poison is maybe UB for
+    # instance and branching undef is maybe ND choice.
 
-    # Want to mention pick as well.
+*** How do we handle ~undef~ in Vellvm?
+
+    # Want to mention pick as well. Actually not sure this is necessary.
 
     ~undef~ handling in Vellvm is fairly complex as we wanted to match
     the apparent semantics of LLVM as much as possible. This means
@@ -468,15 +478,12 @@
     would have to concretize a value in order to store it in memory,
     and it seems like that would fix what the value could be... But it
     does also seem like LLVM permits the compiler to treat values in
-    memory as though they can be partially undefined as well.
-
+    memory as though they can be partially undefined as well. So,
     Vellvm doesn't support storing partially defined values in memory
-    right now, and in some sense that sort of makes sense. Otherwise
-    concrete memory models would have to be able to concretize and
-    evaluate LLVM expressions in order to store a value in memory,
-    which is a little frustrating because we want the memory model to
-    be very modular and oblivious to how LLVM works. This is a
-    potential area for improvement.
+    right now, but we think we can improve this in the future.
+
+    Having all of this ~uvalue~ stuff does make the interpreter /
+    model much more complicated, though.
 
 ** Poison
 
@@ -487,7 +494,7 @@
    pretty much any operation on ~poison~ is just ~poison~, and if it's
    used in any side-effecting way then it raises undefined behaviour.
 
-*** TODO How is it useful?
+*** How is it useful?
 
     ~poison~ is essentially a kind of deferred undefined behaviour.
 
@@ -497,36 +504,44 @@
     loops. For instance:
 
     #+begin_src c
-      while (c) {
-          int x = k + 1;
-          printf("%d\n", x);
+      for (int i = 0; i <= n; ++i) {
+          a[(size_t)i] = 42;
       }
     #+end_src
 
     Could potentially be optimized to:
 
     #+begin_src c
-      int x = k + 1;
-      while (c) {
-          printf("%d\n", x);
+      for (size_t i = 0; i <= n; ++i) {
+          a[i] = 42;
       }
     #+end_src
 
-    But this only works in the case where ~k~ is nonzero.
+    That is, you can lift the sign extension of the index out of the
+    loop. However, this is only valid if it were UB for ~i~ to
+    overflow beforehand, since ~size_t~ is bigger than ~i~. If ~i~
+    overflowing just resulted in ~undef~, then we would still only
+    index within the range of integers, so this optimization which
+    allows indexing outside of this region would not be justified.
 
 *** How do we handle ~poison~ in Vellvm?
 
-** TODO ~poison~ vs ~undef~
+    Poison in Vellvm is much simpler than ~undef~ because pretty much
+    anything that operates on poison results in poison, and there are
+    a few places where we use poison to trigger a UB event, 
+
+** ~poison~ vs ~undef~
 
    # finish the part with undef justifying an optimization.
 
    I don't want to get too into the weeds about the differences
    between ~poison~ and ~undef~. It's a bit confusing that LLVM has
    both of these things, and they're slightly different. ~poison~ is
-   essentially stronger than ~undef~, and essentially says that if the
-   value is used then it's undefined behaviour. ~undef~ means that the
-   value can take on any arbitrary bit pattern, kind of like an
-   uninitialized variable. They both justify different optimizations.
+   stronger than ~undef~, and essentially says that if the value is
+   used then it's undefined behaviour. ~undef~ means that the value
+   can take on any arbitrary bit pattern, kind of like an
+   uninitialized variable. They both justify different optimizations,
+   but it's also inconsistent in LLVM.
 
    For instance if overflow was ~undef~ instead of ~poison~ then you
    wouldn't be able to optimize
@@ -552,15 +567,47 @@
    for ~a + 1~ which is larger than ~INT_MAX~, so we can't just pick a
    value that makes this expression a constant ~true~.
 
-   Similarly undef can justify...
+* TODO Refinement and Vellvm
 
-* Example of hoisting?
+  Refinment relations in Vellvm have to take into account undefined
+  values. This means that we have to have a refinement relation on
+  ~uvalues~, the expressions representing partially defined values.
 
-* UB in Vellvm
-** Refinement relations
+  #+begin_src coq
+    (* Refinement relation for uvalues *)
+    Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
+    | UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
+    | RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
+    .
+  #+end_src
 
-   - Must take into account undef / poison
-   - Must handle UB
+  So, ~undef~ refines ~poison~, and ~uv1~ refines ~uv2~ if any
+  concretization of ~uv1~ is also a concretization of ~uv2~.
+
+  #+begin_src coq
+    (* Refinement of uninterpreted mcfg *)
+    Definition refine_L0: relation (itree L0 uvalue) := eutt refine_uvalue.
+
+    (* Refinement of mcfg after globals *)
+    Definition refine_res1 : relation (global_env * uvalue)
+      := TT × refine_uvalue.
+
+    (* ... *)
+  #+end_src
+  
+  And then we have a bunch of levels of refinements for reasoning
+  about LLVM programs at different levels of interpretation. Mostly
+  the LLVM program ~l1~ is a refinement of ~l2~ if the denotated
+  itrees are equivalent up to ~Tau~, and the resulting ~uvalue~ is
+  equivalent up to ~Tau~.
+  
+  #+begin_src coq
+    (* Refinement for after interpreting pick. *)
+    Definition refine_L4 : relation ((itree L4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
+      := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
+  #+end_src
+
+  And there are more interesting relations under our propositional model.
 
 * A better future? Freeze / thaw semantics
 ** Freeze / Thaw
