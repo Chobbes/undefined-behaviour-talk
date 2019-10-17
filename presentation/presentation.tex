@@ -42,7 +42,7 @@
 
 
 % Haskell settings for lstlisting
-\lstset{language=Haskell,
+\lstset{language=C,
 basicstyle=\ttfamily\tiny,
 keywordstyle=\color{syntax_orange}\bfseries,
 stringstyle=\color{syntax_red},
@@ -109,6 +109,143 @@ showstringspaces=false}
 
   \huge{Done.}
 
+\end{frame}
+
+\begin{frame}
+  \frametitle{What is undefined behaviour (UB?)}
+
+  Why does this seem hard?\\~
+
+  \pause
+  \begin{itemize}
+\item Easy to conflate with things like implementation defined
+  behaviour... Which is sort of different.
+  \pause
+\item Language dependent.
+  \begin{itemize}
+  \item  Array out of bounds in Python? Exception, not UB.
+    \pause
+  \item Array out of bounds in C? ... Pray.
+  \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{What happens when you encounter UB?}
+
+  \pause
+
+  {\huge ANYTHING.}\\~
+
+  \pause
+
+  {\huge Yes. \pause Anything.}\\~
+  
+\end{frame}
+
+\begin{frame}
+  \frametitle{What happens when you encounter UB?}
+
+  Compiler will do whatever it finds easiest or most efficient.\\~
+
+  \begin{itemize}
+  \item noop, and then continue
+  \item halt
+  \item halt {\bf and} catch fire
+  \item erase the hard drive
+    \pause
+    \begin{itemize}
+    \item No, seriously. Erase the hard drive.
+    \item \url{https://kristerw.blogspot.com/2017/09/why-undefined-behavior-may-call-never.html}
+    \end{itemize}
+    \pause
+  \item time travel
+    \pause
+    \begin{itemize}
+    \item no, really.
+    \item \url{https://devblogs.microsoft.com/oldnewthing/?p=633}
+    \end{itemize}
+    \pause
+  \item nasal demons?
+    \pause
+    \begin{itemize}
+    \item \url{https://en.wikipedia.org/wiki/Nasal\_demons}
+      \pause
+    \item So far I'm pretty sure this is just a joke, but I wouldn't
+      rule it out.
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Why is this useful?}
+
+  Why have UB at all? Isn't it... {\tiny crazy?} \\~
+
+  \pause
+
+  \begin{itemize}
+  \item PL without UB might have a lot of dynamic sanity checks.
+    \begin{itemize}
+    \item Bounds checking.
+    \end{itemize}
+    \pause
+  \item What about type systems?
+    \begin{itemize}
+    \item Static checks can eliminate some dynamic checks
+    \item Bounds checking still common.
+    \end{itemize}
+  \end{itemize}
+
+  Instead, why not...\\~
+  \pause
+
+  Do nothing?
+\end{frame}
+
+\begin{frame}
+  \frametitle{Why is this useful?}
+
+  UB may seem somewhat unprincipled, but it has advantages:\\~
+
+  \begin{itemize}
+  \item Gives compiler an axiom.
+  \item Puts burden on programmer, or other tools
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile,fragile]
+  \frametitle{UB can reflect programmer intent}
+
+  I want to change this...\\~
+
+\begin{lstlisting}
+a + b < a + c
+\end{lstlisting}
+
+  \pause
+
+  To this:\\~
+
+\begin{lstlisting}
+b < a
+\end{lstlisting}
+
+  After all, who wants to do 2 extra additions?\\~
+
+  \pause
+
+  But this is sort of wrong...\\~
+
+\begin{lstlisting}
+1 + INT_MAX < 1 + 3
+// This evaluates to
+INT_MIN < 4 == True
+
+// But...
+INT_MAX < 3 == False
+\end{lstlisting}
 \end{frame}
 
 \begin{frame}
