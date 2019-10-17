@@ -60,15 +60,36 @@
 
   So, why have undefined behaviour at all? It seems kind of crazy to
   have these little time bombs in your programming language. Can we
-  have a programming language without? Absolutely! But it does give
-  the compiler for such programming languages less flexibility for how
-  to handle optimizations and corner cases.
+  have a programming language without? Absolutely!
 
-  You see, undefined behaviour essentially gives the compiler extra
-  axioms to reason about your code. The compiler can essentially
-  assume that undefined behaviour is not triggered in a program, which
-  can actually be really useful, and more accurately reflect
-  programmer intent.
+  But, what would such a programming language look like? Most
+  programming languages are expressive enough that you can get
+  yourself in a lot of trouble, like say, indexing out of bounds of an
+  array. Because it's undecidable in general to ensure your programs
+  are well behaved, in order to have a well-specified behaviour these
+  programs are going to need dynamic sanity checks to, say, always
+  raise an exception when it walks off the end of an array.
+
+  Of course, certain kinds of sanity checks may be performed at
+  compile time. A common example of this is static type checking which
+  can ensure that you only perform operations on values with sensible
+  types, but this usually only gets you so far before becoming rather
+  cumbersome, and in many of these languages things like dynamic
+  bounds checking is still very common.
+
+  So, undefined behaviour is the alternative to either having dynamic
+  checks, or verifying properties with static checks. You may not want
+  to have dynamic checks because it's expensive at run time, and you
+  may not be able to have a static check because the property is
+  undecidable in general... So, just put the burden on the programmers
+  plate and say "you make sure this doesn't happen!"
+
+  Moreover, while this may seem a little nuts, undefined behaviour
+  essentially gives the compiler extra axioms to reason about your
+  code. The compiler can essentially assume that undefined behaviour
+  is not triggered in a program, and that the programmer has ensured
+  that everything is peachy. This can actually be really useful, and
+  more accurately reflect programmer intent.
 
   Take for instance this simple piece of code
 
