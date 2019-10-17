@@ -60,20 +60,22 @@
 
   So, why have undefined behaviour at all? It seems kind of crazy to
   have these little time bombs in your programming language. Can we
-  have a programming language without? Absolutely!
+  have a programming language without?
+
+  Absolutely!
 
   But, what would such a programming language look like? Most
   programming languages are expressive enough that you can get
   yourself in a lot of trouble, like say, indexing out of bounds of an
   array. Because it's undecidable in general to ensure your programs
-  are well behaved, in order to have a well-specified behaviour these
-  programs are going to need dynamic sanity checks to, say, always
-  raise an exception when it walks off the end of an array.
+  are well behaved, in order to have well-specified behaviour these
+  programs need dynamic sanity checks to always raise an exception in
+  such a case.
 
   Of course, certain kinds of sanity checks may be performed at
   compile time. A common example of this is static type checking which
-  can ensure that you only perform operations on values with sensible
-  types, but this usually only gets you so far before becoming rather
+  ensures operations are only performed on values with sensible types,
+  but this usually only gets you so far before becoming rather
   cumbersome, and in many of these languages things like dynamic
   bounds checking is still very common.
 
@@ -81,18 +83,22 @@
   checks, or verifying properties with static checks. You may not want
   to have dynamic checks because it's expensive at run time, and you
   may not be able to have a static check because the property is
-  undecidable in general... So, just put the burden on the programmers
-  plate and say "you make sure this doesn't happen!"
+  undecidable in general... 
 
-  Moreover, while this may seem a little nuts, undefined behaviour
-  essentially gives the compiler extra axioms to reason about your
-  code. The programmer is supposed to ensure that undefined behaviour
-  can't happen, so the compiler can assume that any program it's given
-  does not exhibit undefined behaviour. This is not without risks, but
-  this can actually be really useful, and more accurately reflect
-  programmer intent.
+  So, just... Don't... Check.
 
-  Take for instance this simple piece of code
+  Languages like C put the burden on the programmers plate and say
+  "you make sure this doesn't happen!"
+
+  While this may seem a little nuts, undefined behaviour essentially
+  gives the compiler extra axioms to reason about your code. The
+  programmer is supposed to ensure that undefined behaviour can't
+  happen, so the compiler can assume that anything it's compiling does
+  not exhibit undefined behaviour. This is not without risks,
+  programmers make mistakes, but this can actually be really useful,
+  and more accurately reflect programmer intent.
+
+  For instance, take this simple piece of code
 
   #+begin_src c
     a + b < a + c
@@ -119,14 +125,13 @@
   #+end_src
 
   However, in C signed integer overflow is undefined behaviour, which
-  essentially says that we don't care what the result of that
-  operation is in such corner cases, we'll just assume that good
-  programs don't do such silly things, and then on any valid program
-  which doesn't exhibit undefined behaviour the optimization does what
-  you expect.
+  essentially means that we don't care about the result of addition in
+  such corner cases, we'll just assume that good programs don't do
+  such silly things, and then on any valid program which doesn't
+  exhibit undefined behaviour the optimization does what you expect.
 
   So, in some sense undefined behaviour can help the compiler to make
-  optimizations based on how programmers actually expect things to be
+  optimizations based on how programmers expect things to be
   used. Generally speaking you don't want integers to overflow, you
   want to assume that all of the values you operate on actually fit in
   your data type, and you want to reason about code based on that
@@ -134,12 +139,15 @@
   extra burden, the programmer has to make sure that the invariant "no
   signed overflow occurs" actually holds, otherwise they risk the
   compiler transforming their code in unexpected ways, but this is a
-  tradeoff and we do get something from it --- higher performance code.
+  tradeoff and we do get something from it --- higher performance
+  code.
 
 * Pointer aliasing
 
-  Undefined behaviour can also allow compilers to make optimizations
-  based on invariants whose proofs are undecidable in general.
+  So, UB can make optimizations match programmer intuitions a little
+  better, but undefined behaviour can also allow compilers to make
+  optimizations based on invariants whose proofs are undecidable in
+  general.
 
   For instance, it might be really nice to optimize this:
 
@@ -244,12 +252,12 @@
    char inp = getchar();
    if ('A' == inp) {
        printf("Hello, world!\n");
-       x = 1 / 0;
+       // x = 1 / 0;
    }
  #+end_src
 
- I believe that CompCert (and Vellvm as well) take the latter, more
- conservative approach. This is certainly more stable than the former
+ I believe that CompCert (and Vellvm as well) take this more
+ conservative approach. It's certainly more stable than the former
  approach (in fact, it's also a refinement of it), and it does seem to
  make more sense from the perspective that none of the prior
  operations exhibit undefined behaviour, so it seems a bit silly to
@@ -262,9 +270,9 @@
  that UB /cannot/ happen, while the latter merely states that
  triggering UB means /anything/ can happen.
 
- I'm not really sure what the right choice is, though. For instance,
- the C++ standard, for instance, seems to explicitly state that this
- time traveling is allowed.
+ I'm not really sure what the right choice is. For instance, the C++
+ standard, for instance, seems to explicitly state that this time
+ traveling is allowed.
 
  #+begin_example
    However, if any such execution contains an undefined operation,
@@ -299,9 +307,9 @@
   particularly if the IR is intended as a target for multiple
   programming languages, which might handle UB very differently.
 
-  One example for how this kind of thing could look already exists in
-  LLVM IR. You can control what's considered undefined behaviour for
-  add instructions.
+  One example for how this could look already exists in LLVM IR. You
+  can control what's considered undefined behaviour for add
+  instructions.
 
   #+begin_src llvm
     <result> = add <ty> <op1>, <op2>          ; yields ty:result
@@ -324,20 +332,20 @@
   programming languages like Rust which can guarantee that pointer
   arguments don't alias statically, and also useful for things like
   Fortran which put the burden of ensuring there's no aliasing on
-  programmers.
+  programmers. Everybody wins.
 
   Having a type system that could allow you to express these
-  invariants could be really useful, and explicit annotations could
-  make it clear when you actually rely upon undefined behaviour, and
-  we're already starting to see some cases of this, like with C99s
+  invariants could be really useful. Explicit annotations can make it
+  clear when you actually rely upon undefined behaviour, and we're
+  already starting to see some cases of this, like with C99s
   ~restrict~ keyword, which says that a pointer argument does not
   alias with anything. May we live in interesting times.
 
 * Indeterminate values
 
-  I'm going to talk a bit about UB and handling it in LLVM / Vellvm,
-  but first we have to discuss an import part of LLVM. ~undef and
-  ~poison~ values.
+  So, now we're going to transition to talking a bit about UB and
+  handling it in LLVM / Vellvm, but first we have to discuss an
+  important part of LLVM. ~undef and ~poison~ values.
 
   ~undef~ and ~poison~ are what we call indeterminate values,
   particularly ~undef~.  They're intimately related to undefined
@@ -349,19 +357,18 @@
 ** Undef
 
    LLVM lets you specify that a value is ~undef~, but what exactly
-   does this mean? Is ~undef~ undefined behaviour? No!
-
-   It can be very tempting to think of ~undef~ as being UB because of
-   the name, but it's actually a very different concept. ~undef~ can
-   be thought of as an "unspecified" or "uninitialized" value. This
-   means that the value can take on any bit pattern. This might lead
-   to UB if a possible value triggers UB, but it also doesn't have
-   to. Here we're just saying "we don't care what value this variable
-   takes, make it whatever is convenient at the time.
+   does this mean? It can be very tempting to think of ~undef~ as
+   being UB because of the name, but it's actually a very different
+   concept. ~undef~ can be thought of as an "unspecified" or
+   "uninitialized" value. This means that the value can take on any
+   bit pattern. This might lead to UB if a possible value triggers UB,
+   but it also doesn't have to. Here we're just saying "we don't care
+   what value this variable takes, make it whatever is convenient at
+   the time.
 
    One point of confusion with ~undef~ is that LLVM really does not
-   like to hold a particular representation of a value that we don't
-   care about. So,
+   like to hold a particular representation of an ~undef~ value. Why
+   save an arbitrary bit pattern if we don't care about it? So,
 
    #+begin_src llvm
      %x = i32 undef
@@ -377,25 +384,25 @@
 
    LLVM basically puts off evaluating ~undef~, and each time an
    ~undef~ is used it can take on a different value. This means that
-   the compiler doesn't have to worry about saving the value of an
-   uninitialized variable, for instance.
+   the compiler doesn't have to worry about things like saving the value of an
+   uninitialized variable.
 
-   # Maybe explain "don't care" better.
    This does mean that ~undef~ is somewhat stronger than "we don't
    care what value this variable is assigned", it's essentially "we
    don't care about what value this variable has at all throughout its
-   entire life-cycle, if it changes randomly between uses".
+   entire life-cycle, even if it changes randomly between uses".
 
 *** More complicated undef
 
-   However, our current understanding of ~undef~ is that in this case:
+   However, ~undef~ can get more complicated. Our current
+   understanding of ~undef~ is that in this case:
 
    #+begin_src llvm
      %x = i32 undef
      %y = mul i32 %x 2
    #+end_src
 
-   ~%y~ is actually the set of all even numbers, so something like
+   ~%y~ is actually the set of all even numbers, and something like
 
    #+begin_src llvm
      %z = add i32 %y %y
@@ -409,15 +416,32 @@
    This seems sort of crazy, because after you compute a value for
    ~%y~ it seems like it would make sense to just save that value and
    use it in both places. This is still a valid thing to do, of
-   course, but LLVM lets this behave more broadly, which can
+   course, but LLVM lets this behave more broadly, which could
    potentially allow for more optimizations, but we will see how this
    is painful for Vellvm shortly.
 
-*** TODO How is it useful?
+*** How is it useful?
 
     But first, how is ~undef~ actually useful for optimizations?
 
-*** TODO How does ~undef~ relate to UB?
+    One example from the Taming Undefined Behaviour in LLVM paper is this:
+
+    #+begin_src c
+      int x;
+      if (cond) {
+          x = f();
+      }
+
+      if (cond2) {
+          g(x);
+      }
+    #+end_src
+
+    Calling ~g(x)~ with an uninitialized value may be undefined
+    behaviour, but if you can show that ~cond2~ implies ~cond~. Giving
+    ~x~ the value of ~undef~ means that we don't have to care about
+    it, and the compiler doesn't have to ensure that ~x~ gets assigned
+    some value like ~0~ when it's not necessary.
 
 *** TODO How do we handle ~undef~ in Vellvm?
 
