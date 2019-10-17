@@ -86,10 +86,11 @@
 
   Moreover, while this may seem a little nuts, undefined behaviour
   essentially gives the compiler extra axioms to reason about your
-  code. The compiler can essentially assume that undefined behaviour
-  is not triggered in a program, and that the programmer has ensured
-  that everything is peachy. This can actually be really useful, and
-  more accurately reflect programmer intent.
+  code. The programmer is supposed to ensure that undefined behaviour
+  can't happen, so the compiler can assume that any program it's given
+  does not exhibit undefined behaviour. This is not without risks, but
+  this can actually be really useful, and more accurately reflect
+  programmer intent.
 
   Take for instance this simple piece of code
 
