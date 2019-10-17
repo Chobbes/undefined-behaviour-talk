@@ -614,17 +614,22 @@
 
    undef and poison are pretty confusing. One method of making this
    better is the proposed freeze / thaw semantics which basically
-   removes ~undef~ in favor of ~poison~, and then adds a ~freeze~
-   instruction which turns a ~poison~ value into a nondeterministic
-   choice like ~undef~, but which is immediately fixed to a value,
-   instead of having the weird ~undef~ lazy semantics.
+   removes ~undef~ in favor of ~poison~, which is generally much
+   better behaved, and then adds a ~freeze~ instruction which turns a
+   ~poison~ value into a nondeterministic choice like ~undef~, but
+   which is immediately fixed to a value, instead of having the weird
+   ~undef~ lazy semantics.
 
-*** Why is this better?
+   This semantics is much easier to understand, clarifying some things
+   like branching on poison being UB, and making the ~undef~
+   equivalent ~freeze~ of ~poison more of what you would expect, while
+   still justifying a good number of optimizations.
 
-    - Much easier to understand
-      + the ~undef~ equivalent, ~freeze~ of ~poision~ acts how you
-        expect ~undef~ to behave.
-    - Undef behaviour can still be recovered, it just has to be explicit.
+   Furthermore the behaviour of ~undef~ can still largely be
+   recovered, it just has to be explicit with multiple ~freeze~
+   instructions.
+
+   If you want to know more, read Taming Undefined Behaviour in LLVM.
 
 ** Can vellvm support this
 
