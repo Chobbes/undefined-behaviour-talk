@@ -1,9 +1,12 @@
-\documentclass{beamer}
+\documentclass[handout]{beamer}
 
 \usepackage{hyperref}
 \usepackage{listings}
 \usepackage{color}
 \usepackage{hyperref}
+
+%\def\lstlanguagefiles{defManSSR.tex}
+%\lstloadlanguages{SSR}
 
 \usepackage[backend=bibtex]{biblatex}
 \addbibresource{citations.bib}
@@ -41,7 +44,7 @@
 \definecolor{syntax_orange}{rgb}{0.7, 0.4, 0.2} % For keywords
 
 
-% Haskell settings for lstlisting
+% C settings for lstlisting
 \lstset{language=C,
 basicstyle=\ttfamily\tiny,
 keywordstyle=\color{syntax_orange}\bfseries,
@@ -317,7 +320,7 @@ void sum(double *total, double *array, size_t len )
 
 \end{frame}
 
-\begin{frame}[fragile]
+\begin{frame}[fragile,fragile]
   \frametitle{WHERE WE'RE GOING WE DON'T NEED ROADS}
 
   \pause
@@ -341,11 +344,372 @@ if ('A' == inp) {
 \begin{lstlisting}
 getchar();
 \end{lstlisting}
-  
+
+  \pause
+
+  Or maybe just this?
+
+\begin{lstlisting}
+char inp = getchar();
+if ('A' == inp) {
+    printf("Hello, world!\n");
+}
+\end{lstlisting}
+
+  \pause
+
+  Does UB mean {\bf cannot} happen or {\bf anything} can happen?
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Depends who you ask}
+
+  Supposedly the C++ standard says this:\\~
+
+\begin{verbatim}
+However, if any such execution contains an undefined operation,
+this International Standard places no requirement on the
+implementation executing that program with that input
+(not even with regard to operations preceding the
+first undefined operation).
+\end{verbatim}
+
+  \pause
+
+  So, C++ seems to explicitly allow this kind of time travel.\\~
+
+  In general UB seems to be somewhat of an underspecified
+  concept. Both options seem reasonable, depending on what you want to
+  do.
+
 \end{frame}
 
 \begin{frame}
-  \frametitle{References}
+  \frametitle{Undefined behaviour in IR}
+
+  Now we know a few things about UB.\\~
+
+  \begin{itemize}
+  \item Seems to be useful for optimizations.
+  \item With languages like C, passes burden onto the programmer :(.
+  \end{itemize}
+
+  Whether or not you like UB in a programming language... It seems to
+  make some sense for an IR.
+
+  \begin{itemize}
+  \item Again, optimizations
+  \item Way to pass down invariants from higher levels
+    \begin{itemize}
+    \item Either the programmer proves something (or pretends to have
+      proved something)
+    \item Type systems when the types get erased
+    \item Other external tools / checkers
+      \begin{itemize}
+      \item Maybe you even use something like Coq to verify your
+        C. Why not get better optimizations in that case?
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Expressive UB in IRs?}
+
+  Why not have a lot of control over exactly what counts as UB?\\~
+
+  \pause
+
+  LLVM Has some of this already:
+
+\begin{verbatim}
+<result> = add <ty> <op1>, <op2>
+<result> = add nuw <ty> <op1>, <op2>
+<result> = add nsw <ty> <op1>, <op2>
+<result> = add nuw nsw <ty> <op1>, <op2>
+\end{verbatim}
+
+  Lets compilers pick the option that best suits the situation.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Indeterminate values in LLVM}
+
+  LLVM has indenterminate values in the form of {\tt undef} and {\tt
+    poison}.\\~
+
+  \begin{itemize}
+  \item Not undefined behaviour themselves
+    \begin{itemize}
+    \item But, closely related
+    \end{itemize}
+  \item ``it doesn't matter what value this has''
+  \item ``this value won't be used''
+  \end{itemize}
+
+  \pause
+
+  {\tt undef} and {\tt poison} are sort of messy. We're doing our best
+  to describe what we believe LLVM to be in Vellvm, but it's not
+  always clear with these two.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Undef}
+
+  {\tt undef} is more like ``undefined value'' than ``undefined
+  behaviour''.\\~
+
+  \begin{itemize}
+  \item Unspecified / arbitrary bit pattern
+    \begin{itemize}
+    \item uninitialized variables
+    \item loads from uninitialized memory
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+  \begin{frame}[fragile]
+    \frametitle{Undef's laziness}
+
+    {\tt undef} is a little weird.\\~
+
+\begin{lstlisting}
+%x = i32 undef
+%y = add i32 %x %x
+\end{lstlisting}
+
+    Is the same as this:\\~
+
+\begin{lstlisting}
+%x = i32 undef
+%y = i32 undef  ;; Not just even numbers
+\end{lstlisting}
+
+    Why?\\~
+
+    \pause
+
+    {\tt undef} isn't just ``I don't care what value this
+    variable has'' it's more like ``I don't even care if this variable
+    has a specific value.''\\~
+
+    No need to save an arbitrary bit pattern if it shouldn't change
+    the behaviour of the program.
+  \end{frame}
+
+  \begin{frame}[fragile]
+    \frametitle{Undef gets a little weirder...}
+
+    But \texttt{undef} does not always beget undef...\\~
+
+\begin{lstlisting}
+%x = i32 undef
+%y = mul i32 %x 2
+\end{lstlisting}
+
+    What's {\tt y}? \\~
+
+    \pause
+
+    It's also an indeterminate value. The set of all even numbers,
+    and...
+
+\begin{lstlisting}
+%z = add i32 %y %y
+\end{lstlisting}
+
+    \pause
+
+    Also the set of even numbers. Not some multiple of 4. LLVM again allows
+    {\tt y} to have a different value each time, but it must be a
+    multiple of 2.
+  \end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{How is undef useful?}
+
+\begin{lstlisting}
+int x;
+if (cond) {
+    x = f();
+}
+
+if (cond2) {
+    g(x);
+}
+\end{lstlisting}
+
+  Why force a value for {\tt x}? What if $\mathrm{cond2}
+  \implies \mathrm{cond}$?\\~
+
+  We can assume {\tt x} is assigned before use, and avoid an arbitrary
+  assignment to {\tt x}.
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{undef under Vellvm}
+
+  Keep full {\tt undef} expressions to avoid early concretization.\\~
+
+\begin{lstlisting}
+(undef + 2) * (3 * undef)  // Left in this complicated form
+\end{lstlisting}
+
+  Makes interpreter / model much more complicated. \\~
+
+  We have ``pick'' events whenever we have to concretize {\tt undef},
+  when side-effecting operations occur. Even something like {\tt div}
+  forces pick events.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Spreading poison}
+
+  Sometimes we need something a little stronger than {\tt undef}:
+  {\tt poison}.\\~
+
+  \begin{itemize}
+  \item Can always relax {\tt poison} to {\tt undef}.
+  \item Poison is much simpler.
+  \item Operations on poison result in poison
+  \item If you use poison with something that causes side-effects you
+    get UB.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{How can we use poison?}
+
+  ~poison~ is really useful as a kind of deferred undefined
+  behaviour. Can use it for a kind of speculative execution.
+
+\begin{lstlisting}
+      for (size_t i = 0; i <= n; ++i) {
+          a[i] = x + 1;
+      }
+\end{lstlisting}
+
+  Can we optimize this? \pause Maybe to this?
+
+\begin{lstlisting}
+      int y = x + 1;
+      for (size_t i = 0; i <= n; ++i) {
+          a[i] = y;
+      }
+\end{lstlisting}
+
+  Want to delay UB from $x + 1$, so LLVM gives overflows the value of
+  poison.
+  
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{More uses of poison}
+  Similarly, can we optimize this?
+  
+\begin{lstlisting}
+      for (int i = 0; i <= n; ++i) {
+          a[(size_t)i] = 42;
+      }
+\end{lstlisting}
+
+  \pause To this?
+
+\begin{lstlisting}
+      for (size_t i = 0; i <= n; ++i) {
+          a[i] = 42;
+      }
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Poisoning Vellvm}
+
+  Poison in Vellvm is much simpler than {\tt undef}. Basically just
+  have operations return a {\tt poison} if they're given {\tt
+    poison}.\\~
+
+  Certain operations on poison will trigger UB.
+  
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{poison vs undef}
+
+  \begin{itemize}
+  \item Don't want to get too hung up on this, because it is
+    confusing.
+  \item {\tt poison} and {\tt undef} are similar, but  slightly
+    different
+  \item  Justify different optimizations
+
+\begin{lstlisting}
+a + 1 > a
+\end{lstlisting}
+
+    To...
+
+\begin{lstlisting}
+true // Or I guess 1 in C...
+\end{lstlisting}
+  \end{itemize}
+
+  only works with poison for $a + 1$ overflowing.
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Refinement and Vellvm}
+
+\begin{verbatim}
+    (* Refinement relation for uvalues *)
+    Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
+    | UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
+    | RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
+    .
+\end{verbatim}
+
+  \pause
+  
+\begin{verbatim}
+    (* Refinement of uninterpreted mcfg *)
+    Definition refine_L0: relation (itree L0 uvalue) := eutt refine_uvalue.
+
+    (* Refinement of mcfg after globals *)
+    Definition refine_res1 : relation (global_env * uvalue)
+      := TT x refine_uvalue.
+
+    (* ... *)
+\end{verbatim}
+
+  \pause
+
+\begin{verbatim}
+      (* Refinement for after interpreting pick. *)
+    Definition refine_L4 : relation ((itree L4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
+      := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
+\end{verbatim}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Better future}
+
+  More clear semantics for undef / poison? Freeze thaw?
+
+  \begin{itemize}
+  \item remove undef. Only poison.
+  \item freeze of poison is nondeterministic choice.
+  \end{itemize}
+\end{frame}
+
+  \begin{frame}
+    \frametitle{References}
 
   \nocite{*}
   \printbibliography

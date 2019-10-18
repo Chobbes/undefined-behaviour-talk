@@ -483,7 +483,16 @@
     right now, but we think we can improve this in the future.
 
     Having all of this ~uvalue~ stuff does make the interpreter /
-    model much more complicated, though.
+    model much more complicated, though. We have to have pick events
+    to collapse the nondeterminism of these ~undef~ structures
+    whenever a side-effecting operation occurs. These pick events can
+    be handled however we want in Vellvm, currently the main
+    interpreter just sets all ~undef~ values to 0.
+
+    We also have a propositional model which essentially builds up a
+    predicate which is provable whenever UB does not occur. In certain
+    cases, like when performing a div, we add additional constraints
+    like "the value of the denominator can not be 0".
 
 ** Poison
 
@@ -502,6 +511,23 @@
     instance if you want to perform loop invariant code motion,
     optimizations which lift loop invariant expressions outside of
     loops. For instance:
+
+    #+begin_src c
+      for (size_t i = 0; i <= n; ++i) {
+          a[i] = x + 1;
+       }
+    #+end_src
+
+    We want ~x + 1~ to be UB if it overflows, but not immediate UB because we want to be able to do this:
+
+    #+begin_src c
+      int y = x + 1;
+      for (size_t i = 0; i <= n; ++i) {
+          a[i] = y;
+       }
+    #+end_src
+
+    Similarly:
 
     #+begin_src c
       for (int i = 0; i <= n; ++i) {
