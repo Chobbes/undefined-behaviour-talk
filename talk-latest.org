@@ -1,5 +1,6 @@
 * Introduction
 
+  # what is this talk about slide.
   Hi, I'm Calvin, a second year PhD student here. Lately I have been
   working a bit on the Vellvm project, which is a Coq semantics for
   the LLVM intermediate representation. Part of my work on this
@@ -15,15 +16,23 @@
 
 * What is undefined behaviour?
 
+  # next
   Undefined behaviour is really exactly what it sounds like. It's
   behaviour that hasn't been defined for a programming language.
 
+  # next
+  # next
+  
   Done.
 
+  # next
+  # next
   This is a pretty simple definition, but it's easy to conflate it
   with a few things, and it's also easy to get confused because it
   really doesn't say much about what it means for something to be UB.
 
+  # next
+  # next (C)
   It's also a very language dependent thing. What may be considered UB
   in one language may be perfectly well defined in another. This can
   get confusing, and makes it somewhat difficult to nail down what
@@ -31,15 +40,19 @@
 
 * What happens when you encounter UB?
 
+  # next
   So, keeping in mind that I still haven't told you what UB is... What
   happens when you encounter undefined behaviour?
 
+  # next
   Anything.
 
+  # next, next
   Yes, really. Anything. The behaviour of undefined behaviour, being,
   well, undefined, means that you can't really expect any particular
   behaviour when it is encountered.
 
+  # next
   Often the compiler is going to do whatever is most efficient, or
   most convenient in these cases, which may very well not be what you
   expect. This includes, but is in no way limited to:
@@ -47,23 +60,25 @@
   - noop, and then continue as normal
   - halt
   - halt *and* catch fire
-  - erase the hard drive
+  - erase the hard drive # next
     + no, seriously. Erase the hard drive.
     + https://kristerw.blogspot.com/2017/09/why-undefined-behavior-may-call-never.html
-  - time travel
-    + no, really.
+  - time travel # next
+    + no, really. # next
     + https://devblogs.microsoft.com/oldnewthing/?p=633
   - nasal demons?
     + https://en.wikipedia.org/wiki/Nasal_demons
 
 * Why is this useful?
 
+  # next
   So, why have undefined behaviour at all? It seems kind of crazy to
   have these little time bombs in your programming language. Can we
   have a programming language without?
 
   Absolutely!
 
+  # next
   But, what would such a programming language look like? Most
   programming languages are expressive enough that you can get
   yourself in a lot of trouble, like say, indexing out of bounds of an
@@ -72,6 +87,7 @@
   programs need dynamic sanity checks to always raise an exception in
   such a case.
 
+   # next
   Of course, certain kinds of sanity checks may be performed at
   compile time. A common example of this is static type checking which
   ensures operations are only performed on values with sensible types,
@@ -85,11 +101,13 @@
   may not be able to have a static check because the property is
   undecidable in general... 
 
+  # next
   So, just... Don't... Check.
 
   Languages like C put the burden on the programmers plate and say
   "you make sure this doesn't happen!"
 
+  # next
   While this may seem a little nuts, undefined behaviour essentially
   gives the compiler extra axioms to reason about your code. The
   programmer is supposed to ensure that undefined behaviour can't
@@ -98,12 +116,15 @@
   programmers make mistakes, but this can actually be really useful,
   and more accurately reflect programmer intent.
 
+  # next
   For instance, take this simple piece of code
 
   #+begin_src c
     a + b < a + c
   #+end_src
   
+  # next
+
   You might think, "bah"! I don't want to do two extra additions, the
   compiler should be able to rewrite this to:
 
@@ -112,6 +133,8 @@
   #+end_src
 
   and, in fact, C compilers will happily do this optimization...
+
+  # next
 
   But isn't it... wrong? After all, what if ~a + b~ overflows, resulting in a negative number?
 
@@ -144,11 +167,14 @@
 
 * Pointer aliasing
 
+  # next
+  
   So, UB can make optimizations match programmer intuitions a little
   better, but undefined behaviour can also allow compilers to make
   optimizations based on invariants whose proofs are undecidable in
   general.
 
+  # next
   For instance, it might be really nice to optimize this:
 
   #+begin_src c
@@ -198,6 +224,7 @@
   doesn't happen" at the level of an intermediate representation like
   LLVM IR.
 
+  # next
   Interestingly, C actually does provide a keyword to tell the compiler
   "trust me, these pointers don't alias", allowing C compilers to make
   the same set of optimizations, just with an extra tag.
@@ -214,15 +241,17 @@
 
 * How powerful is undefined behaviour? Can it time travel?
 
-  # Should this be here, or somewhere else?
+  # next
  So, this is a bit of a side note. It seems like this undefined
  behaviour thing is really useful, for the compiler anyway. The
  compiler can just assume that these bad cases don't happen, and then
  it can do whatever it wants in these bad situations.
 
+ # next
  But how far does this extend? It seems like there's a couple of camps
  with respect to this, and I'm not really sure who to believe.
-
+ 
+ # next
  One camp says that valid programs never exhibit UB, so if there's a
  branch where UB is always executed, we can just remove that branch
  entirely... So, for something like:
@@ -235,6 +264,7 @@
    }
  #+end_src
 
+ # next
  The if statement can just be optimized to a noop, never printing
  "Hello, world!", even though that happens before the division
  by 0. This is because if we go down this path of execution, we're
@@ -243,6 +273,7 @@
  statement can just be removed. The compiler seems to conclude that no
  user will ever input ~A~, and all is right with the world.
 
+ # next
  This seems a bit extreme, though! A gentler semantics for UB is to
  assume that anything can happen once UB is exhibited, but not
  before. So, perhaps we can just get rid of the bad division, but no
@@ -266,10 +297,12 @@
  this path will exhibit UB, but it also assumes that UB doesn't
  happen. Therefore, the program shouldn't go down this path!
 
+ # next
  The primary difference here, is that the more potent option assumes
  that UB /cannot/ happen, while the latter merely states that
  triggering UB means /anything/ can happen.
 
+ # next
  I'm not really sure what the right choice is. For instance, the C++
  standard, for instance, seems to explicitly state that this time
  traveling is allowed.
@@ -282,6 +315,7 @@
    first undefined operation).
  #+end_example
 
+ # next
  Again, UB seems to be somewhat of an underspecified concept itself,
  and I think both options are perfectly reasonable, as long as
  everybody involved has some idea of how UB is actually treated,
@@ -293,6 +327,7 @@
 
 * Undefined behaviour in LLVM
 
+  # next
   So, undefined behaviour does have its uses. And whether or not you
   think it's a good idea to pass the burden of undefined behaviour
   onto the programmer, it seems to make a lot of sense for an
@@ -302,11 +337,13 @@
   of the compiler (or programmer-compiler stack) could prove, and that
   an IR like LLVM can just assume.
 
+  # next
   In fact, I think it makes a lot of sense to have more control over
   "undefined behaviour" in an intermediate language like LLVM,
   particularly if the IR is intended as a target for multiple
   programming languages, which might handle UB very differently.
 
+  # next
   One example for how this could look already exists in LLVM IR. You
   can control what's considered undefined behaviour for add
   instructions.
@@ -343,6 +380,7 @@
 
 * Indeterminate values
 
+  # next
   So, now we're going to transition to talking a bit about UB and
   handling it in LLVM / Vellvm, but first we have to discuss an
   important part of LLVM. ~undef and ~poison~ values.
@@ -354,6 +392,7 @@
   value this has", or "this value won't be used", which is essentially
   what ~undef~ and ~poison~ do.
 
+  # next
   It's worth prefacing this section with the fact that ~undef~ and
   ~poison~ are sort of... Disputed. Different optimization passes
   treat them differently, and they are not terribly well
@@ -363,6 +402,7 @@
 
 ** Undef
 
+   # next
    LLVM lets you specify that a value is ~undef~, but what exactly
    does this mean? It can be very tempting to think of ~undef~ as
    being UB because of the name, but it's actually a very different
@@ -373,6 +413,7 @@
    what value this variable takes, make it whatever is convenient at
    the time.
 
+   # next
    One point of confusion with ~undef~ is that LLVM really does not
    like to hold a particular representation of an ~undef~ value. Why
    save an arbitrary bit pattern if we don't care about it? So,
@@ -389,6 +430,7 @@
      %y = i32 undef  ;; Not just even numbers
    #+end_src
 
+   # next
    LLVM basically puts off evaluating ~undef~, and each time an
    ~undef~ is used it can take on a different value. This means that
    the compiler doesn't have to worry about things like saving the value of an
@@ -401,6 +443,7 @@
 
 *** More complicated undef
 
+    # next
    However, ~undef~ can get more complicated. Our current
    understanding of ~undef~ is that in this case:
 
@@ -409,12 +452,15 @@
      %y = mul i32 %x 2
    #+end_src
 
+   # next
    ~%y~ is actually the set of all even numbers, and something like
 
    #+begin_src llvm
      %z = add i32 %y %y
    #+end_src
 
+   # next
+   
    would be the set of all multiples of 2, and not multiples of 4 like
    you might expect, because in this expression ~%y~ is actually
    allowed to take different values each time it's used, it's just
@@ -429,6 +475,7 @@
 
 *** How is it useful?
 
+    # next
     But first, how is ~undef~ actually useful for optimizations?
 
     One example from the Taming Undefined Behaviour in LLVM paper is this:
@@ -455,8 +502,7 @@
 
 *** How do we handle ~undef~ in Vellvm?
 
-    # Want to mention pick as well. Actually not sure this is necessary.
-
+    # next
     ~undef~ handling in Vellvm is fairly complex as we wanted to match
     the apparent semantics of LLVM as much as possible. This means
     that wherever we have ~undef~ we essentially have to construct and
@@ -467,7 +513,7 @@
     #+end_src
 
     This lets us preserve the set of values that expressions involving
-    undef can take on, and we can get the kind of delayed
+    ~undef~ can take on, and we can get the kind of delayed
     nondeterministic choice that we saw previously. We call these
     partially undefined expressions ~uvalues~.
 
@@ -494,8 +540,11 @@
     cases, like when performing a div, we add additional constraints
     like "the value of the denominator can not be 0".
 
+    ~div~ instructions are potentially side-effecting.
+
 ** Poison
 
+   # next
    ~poison~ is an even stronger result than ~undef~, and we can
    actually always relax ~poison~ to ~undef~.
 
@@ -505,6 +554,7 @@
 
 *** How is it useful?
 
+    # next
     ~poison~ is essentially a kind of deferred undefined behaviour.
 
     This can be really useful for a kind of speculative execution. For
@@ -518,6 +568,7 @@
        }
     #+end_src
 
+    # next
     We want ~x + 1~ to be UB if it overflows, but not immediate UB because we want to be able to do this:
 
     #+begin_src c
@@ -527,6 +578,9 @@
        }
     #+end_src
 
+    This is why we give ~x+1~ a ~poison~ value instead of making it UB immediately.
+
+    # next
     Similarly:
 
     #+begin_src c
@@ -535,6 +589,7 @@
       }
     #+end_src
 
+    # next
     Could potentially be optimized to:
 
     #+begin_src c
@@ -551,15 +606,14 @@
     allows indexing outside of this region would not be justified.
 
 *** How do we handle ~poison~ in Vellvm?
-
+    # next
     Poison in Vellvm is much simpler than ~undef~ because pretty much
     anything that operates on poison results in poison, and there are
     a few places where we use poison to trigger a UB event, 
 
 ** ~poison~ vs ~undef~
 
-   # finish the part with undef justifying an optimization.
-
+   # next
    I don't want to get too into the weeds about the differences
    between ~poison~ and ~undef~. It's a bit confusing that LLVM has
    both of these things, and they're slightly different. ~poison~ is
@@ -569,7 +623,7 @@
    uninitialized variable. They both justify different optimizations,
    but it's also inconsistent in LLVM.
 
-   For instance if overflow was ~undef~ instead of ~poison~ then you
+   For instance if overflow gave you ~undef~ instead of ~poison~ then you
    wouldn't be able to optimize
 
    #+begin_src c
@@ -595,6 +649,7 @@
 
 * TODO Refinement and Vellvm
 
+  # next
   Refinment relations in Vellvm have to take into account undefined
   values. This means that we have to have a refinement relation on
   ~uvalues~, the expressions representing partially defined values.
@@ -626,7 +681,8 @@
   the LLVM program ~l1~ is a refinement of ~l2~ if the denotated
   itrees are equivalent up to ~Tau~, and the resulting ~uvalue~ is
   equivalent up to ~Tau~.
-  
+
+  # next
   #+begin_src coq
     (* Refinement for after interpreting pick. *)
     Definition refine_L4 : relation ((itree L4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
@@ -638,6 +694,8 @@
 * A better future? Freeze / thaw semantics
 ** Freeze / Thaw
 
+   # next
+
    undef and poison are pretty confusing. One method of making this
    better is the proposed freeze / thaw semantics which basically
    removes ~undef~ in favor of ~poison~, which is generally much
@@ -647,9 +705,10 @@
    ~undef~ lazy semantics.
 
    This semantics is much easier to understand, clarifying some things
-   like branching on poison being UB, and making the ~undef~
-   equivalent ~freeze~ of ~poison more of what you would expect, while
-   still justifying a good number of optimizations.
+   like branching on poison being UB, something which LLVM wavers back
+   and forth about. It also makes the ~undef~ equivalent ~freeze~ of
+   ~poison~ more of what you would expect, while still justifying a
+   good number of optimizations.
 
    Furthermore the behaviour of ~undef~ can still largely be
    recovered, it just has to be explicit with multiple ~freeze~
