@@ -112,7 +112,7 @@ showstringspaces=false}
 \end{frame}
 
 \begin{frame}
-  \frametitle{What is undefined behaviour (UB?)}
+  \frametitle{What is undefined behaviour (UB)?}
 
   Why does this seem hard?\\~
 
@@ -246,6 +246,102 @@ INT_MIN < 4 == True
 // But...
 INT_MAX < 3 == False
 \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Pointer aliasing --- optimizations with undecidability}
+
+  Undefined behavour allows compilers to make optimizations based on
+  undecidable invariants.\\~
+
+  \pause
+
+  It might be nice to optimize this:
+
+\begin{lstlisting}
+void sum(double *total, double *array, size_t len )
+{
+    *total = 0;
+    for (size_t i=0; i<len; i++) {
+        *total += array[i];
+    }
+}
+\end{lstlisting}
+
+  To this:
+
+\begin{lstlisting}
+void sum(double *total, double *array, size_t len )
+{
+    double local_total = 0;
+    for (size_t i=0; i<len; i++) {
+        local_total += array[i];
+    }
+
+    *total = local_total;
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{C's restrict keyword}
+
+\begin{lstlisting}
+void sum(double* restrict total, double* restrict array, size_t len )
+{
+    *total = 0;
+    for (size_t i=0; i<len; i++) {
+        *total += array[i];
+    }
+}
+\end{lstlisting}
+
+  Allows optimization to
+
+\begin{lstlisting}
+void sum(double *total, double *array, size_t len )
+{
+    double local_total = 0;
+    for (size_t i=0; i<len; i++) {
+        local_total += array[i];
+    }
+
+    *total = local_total;
+}
+\end{lstlisting}
+
+  Because restrict says ``these pointers don't alias with
+  anything''. If they happen to alias, then it's UB, and the program
+  can do whatever.
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{WHERE WE'RE GOING WE DON'T NEED ROADS}
+
+  \pause
+  So, how powerful is undefined behaviour?\\~
+
+  \pause
+  Can we optimize this:
+
+\begin{lstlisting}
+char inp = getchar();
+if ('A' == inp) {
+    printf("Hello, world!\n");
+    x = 1 / 0;
+}
+\end{lstlisting}
+
+  \pause
+
+  To this?
+
+\begin{lstlisting}
+getchar();
+\end{lstlisting}
+  
 \end{frame}
 
 \begin{frame}
