@@ -1,4 +1,4 @@
-\documentclass[handout]{beamer}
+\documentclass{beamer}
 
 \usepackage{hyperref}
 \usepackage{listings}
@@ -666,17 +666,17 @@ true // Or I guess 1 in C...
 \begin{frame}[fragile]
   \frametitle{Refinement and Vellvm}
 
-\begin{verbatim}
+\begin{lstlisting}
     (* Refinement relation for uvalues *)
     Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
-    | UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
+    | UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison
     | RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
     .
-\end{verbatim}
+\end{lstlisting}
 
   \pause
   
-\begin{verbatim}
+\begin{lstlisting}
     (* Refinement of uninterpreted mcfg *)
     Definition refine_L0: relation (itree L0 uvalue) := eutt refine_uvalue.
 
@@ -685,15 +685,15 @@ true // Or I guess 1 in C...
       := TT x refine_uvalue.
 
     (* ... *)
-\end{verbatim}
+\end{lstlisting}
 
   \pause
 
-\begin{verbatim}
+\begin{lstlisting}
       (* Refinement for after interpreting pick. *)
     Definition refine_L4 : relation ((itree L4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
       := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
-\end{verbatim}
+\end{lstlisting}
 
 \end{frame}
 
